@@ -163,6 +163,7 @@ public final class InetEndpoint {
                             }
                             if (address instanceof Inet6Address) {
                                 byte[] v6 = address.getAddress();
+                                //解析IP4P记录
                                 if ((v6[0] == 0x20) && (v6[1] == 0x01) && (v6[2] == 0x00) && (v6[3] == 0x00)) {
                                     InetAddress v4 = InetAddress.getByAddress(Arrays.copyOfRange(v6, 12, 16));
                                     int p = ((v6[10] & 0xFF) << 8) | (v6[11] & 0xFF);
