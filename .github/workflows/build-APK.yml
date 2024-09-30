@@ -20,7 +20,7 @@ jobs:
         with:
           java-version: 17
       - name: 构建 APK
-        run: bash ./gradlew assembleFlavorNameRelease
+        run: bash ./gradlew assembleRelease
       - name: 签名
         run: |
          mkdir -p /opt/wg
