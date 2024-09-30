@@ -5,7 +5,18 @@
 
 package com.wireguard.config;
 
+import android.widget.Toast;
+
 import com.wireguard.util.NonNullForAll;
+
+import org.xbill.DNS.Lookup;
+import org.xbill.DNS.Name;
+import org.xbill.DNS.Record;
+import org.xbill.DNS.SRVRecord;
+import org.xbill.DNS.SimpleResolver;
+import org.xbill.DNS.TextParseException;
+import org.xbill.DNS.Type;
+import org.xbill.DNS.TXTRecord;
 
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -14,10 +25,14 @@ import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
 import androidx.annotation.Nullable;
+
+import static com.wireguard.android.BR.endpoint;
+import static com.wireguard.android.BR.endpoint;
 
 
 /**
@@ -29,6 +44,7 @@ import androidx.annotation.Nullable;
 public final class InetEndpoint {
     private static final Pattern BARE_IPV6 = Pattern.compile("^[^\\[\\]]*:[^\\[\\]]*");
     private static final Pattern FORBIDDEN_CHARACTERS = Pattern.compile("[/?#]");
+    private static final String IP_PORT_REGEX = "^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):([0-9]{1,5})$";
 
     private final String host;
     private final boolean isResolved;
@@ -94,18 +110,65 @@ public final class InetEndpoint {
             //TODO(zx2c4): Implement a real timeout mechanism using DNS TTL
             if (Duration.between(lastResolution, Instant.now()).toMinutes() > 1) {
                 try {
-                    // Prefer v4 endpoints over v6 to work around DNS64 and IPv6 NAT issues.
-                    final InetAddress[] candidates = InetAddress.getAllByName(host);
-                    InetAddress address = candidates[0];
-                    for (final InetAddress candidate : candidates) {
-                        if (candidate instanceof Inet4Address) {
-                            address = candidate;
-                            break;
+                    if (port == 0) {
+                        // srv记录
+                        final Lookup lookup = new Lookup(Name.fromString(host), Type.SRV);
+                        lookup.setResolver(new SimpleResolver("114.114.114.114"));
+                        final Record[] records = lookup.run();
+                        if (lookup.getResult() == Lookup.SUCCESSFUL && records.length > 0) {
+                            final SRVRecord srvRecord = (SRVRecord) records[0];
+                            final Name targetName = srvRecord.getTarget();
+                            final InetAddress[] candidates = InetAddress.getAllByName(targetName.toString());
+                            InetAddress address = candidates[0];
+                            for (final InetAddress candidate : candidates) {
+                                if (candidate instanceof Inet4Address) {
+                                    address = candidate;
+                                    break;
+                                }
+                            }
+                            final String addressString = address.getHostAddress();
+                            if (addressString != null) {
+                                resolved = new InetEndpoint(addressString, true, srvRecord.getPort());
+                            }
+                        }
+                    } else if (port == 1) {
+                        // txt记录
+                        final Lookup lookup = new Lookup(Name.fromString(host), Type.TXT);
+                        // 禁用缓存
+                        lookup.setCache(null);
+                        lookup.setResolver(new SimpleResolver("114.114.114.114"));
+                        final Record[] records = lookup.run();
+                        if (lookup.getResult() == Lookup.SUCCESSFUL && records.length > 0) {
+                            final TXTRecord txtRecord = (TXTRecord) records[0];
+                            String recordValue = txtRecord.getStrings().get(0).trim();
+                            if (recordValue.contains("||")) {
+                                recordValue = Pattern.compile("\\|\\|").split(recordValue)[0].trim();
+                            }
+                            if (Pattern.matches(IP_PORT_REGEX, recordValue)) {
+                                final String[] hostPort = Pattern.compile(":").split(recordValue);
+                                final int resPort = Integer.parseInt(hostPort[1], 10);
+                                if (resPort > 0 && resPort <=65535) {
+                                    resolved = new InetEndpoint(hostPort[0], true, resPort);
+                                }
+                            }
+                        }
+                    } else {
+                        // Prefer v4 endpoints over v6 to work around DNS64 and IPv6 NAT issues.
+                        final InetAddress[] candidates = InetAddress.getAllByName(host);
+                        InetAddress address = candidates[0];
+                        for (final InetAddress candidate : candidates) {
+                            if (candidate instanceof Inet4Address) {
+                                address = candidate;
+                                break;
+                            }
+                        }
+                        final String addressString = address.getHostAddress();
+                        if (addressString != null) {
+                            resolved = new InetEndpoint(addressString, true, port);
                         }
                     }
-                    resolved = new InetEndpoint(address.getHostAddress(), true, port);
                     lastResolution = Instant.now();
-                } catch (final UnknownHostException e) {
+                } catch (final UnknownHostException | TextParseException e) {
                     resolved = null;
                 }
             }
