@@ -151,26 +151,29 @@ public final class InetEndpoint {
                             }
                         }
                     } else {
-                        // Prefer v4 endpoints over v6 to work around DNS64 and IPv6 NAT issues.
-                        final InetAddress[] candidates = InetAddress.getAllByName(host);
-                        InetAddress address = candidates[0];
-                        for (final InetAddress candidate : candidates) {
-                            if (candidate instanceof Inet4Address) {
-                                address = candidate;
-                                break;
+                        try {
+                            // Prefer v4 endpoints over v6 to work around DNS64 and IPv6 NAT issues.
+                            final InetAddress[] candidates = InetAddress.getAllByName(host);
+                            InetAddress address = candidates[0];
+                            for (final InetAddress candidate : candidates) {
+                                if (candidate instanceof Inet4Address) {
+                                    address = candidate;
+                                    break;
+                                }
                             }
-                        }
-                        final String addressString = address.getHostAddress();
-                        if (addressString != null) {
-                            resolved = new InetEndpoint(addressString, true, port);
-                        }
-                        if (address instanceof Inet6Address) {
-                        byte[] v6 = address.getAddress();
-                         if ((v6[0] == 0x20) && (v6[1] == 0x01) && (v6[2] == 0x00) && (v6[3] == 0x00)) {
-                            InetAddress v4 = InetAddress.getByAddress(Arrays.copyOfRange(v6, 12, 16));
-                            int p = ((v6[10] & 0xFF) << 8) | (v6[11] & 0xFF);
-                            resolved = new InetEndpoint(v4.getHostAddress(), true, p);
-                         }
+                            if (address instanceof Inet6Address) {
+                                byte[] v6 = address.getAddress();
+                                if ((v6[0] == 0x20) && (v6[1] == 0x01) && (v6[2] == 0x00) && (v6[3] == 0x00)) {
+                                    InetAddress v4 = InetAddress.getByAddress(Arrays.copyOfRange(v6, 12, 16));
+                                    int p = ((v6[10] & 0xFF) << 8) | (v6[11] & 0xFF);
+                                    resolved = new InetEndpoint(v4.getHostAddress(), true, p);
+                                }
+                            }
+                            if (resolved == null)
+                                resolved = new InetEndpoint(address.getHostAddress(), true, port);
+                            lastResolution = Instant.now();
+                        } catch (final UnknownHostException e) {
+                            resolved = null;
                         }
                     }
                     lastResolution = Instant.now();
