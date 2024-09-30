@@ -17,12 +17,14 @@ import org.xbill.DNS.Type;
 import org.xbill.DNS.TXTRecord;
 
 import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -161,6 +163,14 @@ public final class InetEndpoint {
                         final String addressString = address.getHostAddress();
                         if (addressString != null) {
                             resolved = new InetEndpoint(addressString, true, port);
+                        }
+                    }
+                    if (address instanceof Inet6Address) {
+                        byte[] v6 = address.getAddress();
+                        if ((v6[0] == 0x20) && (v6[1] == 0x01) && (v6[2] == 0x00) && (v6[3] == 0x00)) {
+                            InetAddress v4 = InetAddress.getByAddress(Arrays.copyOfRange(v6, 12, 16));
+                            int p = ((v6[10] & 0xFF) << 8) | (v6[11] & 0xFF);
+                            resolved = new InetEndpoint(v4.getHostAddress(), true, p);
                         }
                     }
                     lastResolution = Instant.now();
