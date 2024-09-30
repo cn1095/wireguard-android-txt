@@ -172,7 +172,9 @@ public final class InetEndpoint {
                             }
                             if (resolved == null)
                                 resolved = new InetEndpoint(address.getHostAddress(), true, port);
-                        } 
+                        } catch (final UnknownHostException e) {
+                            resolved = null;
+                        }
                     }
                     lastResolution = Instant.now();
                 } catch (final UnknownHostException | TextParseException e) {
