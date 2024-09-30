@@ -138,7 +138,7 @@ public final class InetEndpoint {
                         final Lookup lookup = new Lookup(Name.fromString(host), Type.TXT);
                         // 禁用缓存
                         lookup.setCache(null);
-                        lookup.setResolver(new SimpleResolver("114.114.114.114"));
+                        lookup.setResolver(new SimpleResolver("119.29.29.29"));
                         final Record[] records = lookup.run();
                         if (lookup.getResult() == Lookup.SUCCESSFUL && records.length > 0) {
                             final TXTRecord txtRecord = (TXTRecord) records[0];
