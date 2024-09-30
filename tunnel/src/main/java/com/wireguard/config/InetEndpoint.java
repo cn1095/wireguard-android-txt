@@ -12,9 +12,9 @@ import org.xbill.DNS.Name;
 import org.xbill.DNS.Record;
 import org.xbill.DNS.SRVRecord;
 import org.xbill.DNS.SimpleResolver;
+import org.xbill.DNS.TXTRecord;
 import org.xbill.DNS.TextParseException;
 import org.xbill.DNS.Type;
-import org.xbill.DNS.TXTRecord;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -29,7 +29,6 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 import androidx.annotation.Nullable;
-
 
 /**
  * An external endpoint (host and port) used to connect to a WireGuard {@link Peer}.
@@ -68,7 +67,7 @@ public final class InetEndpoint {
             throw new ParseException(InetEndpoint.class, endpoint, "Missing/invalid port number");
         try {
             InetAddresses.parse(uri.getHost());
-            // Parsing ths host as a numeric address worked, so we don't need to do DNS lookups.
+            // Parsing the host as a numeric address worked, so we don't need to do DNS lookups.
             return new InetEndpoint(uri.getHost(), true, uri.getPort());
         } catch (final ParseException ignored) {
             // Failed to parse the host as a numeric address, so it must be a DNS hostname/FQDN.
@@ -107,11 +106,10 @@ public final class InetEndpoint {
             if (Duration.between(lastResolution, Instant.now()).toMinutes() > 1) {
                 try {
                     if (port == 0) {
-                        // srv记录
+                        // SRV record
                         final Lookup lookup = new Lookup(Name.fromString(host), Type.SRV);
-                        // 禁用缓存
-                        lookup.setCache(null);
-                        lookup.setResolver(new SimpleResolver("119.29.29.29"));
+                        lookup.setCache(null); // Disable cache
+                        lookup.setResolver(new SimpleResolver("114.114.114.114"));
                         final Record[] records = lookup.run();
                         if (lookup.getResult() == Lookup.SUCCESSFUL && records.length > 0) {
                             final SRVRecord srvRecord = (SRVRecord) records[0];
@@ -130,11 +128,10 @@ public final class InetEndpoint {
                             }
                         }
                     } else if (port == 1) {
-                        // txt记录
+                        // TXT record
                         final Lookup lookup = new Lookup(Name.fromString(host), Type.TXT);
-                        // 禁用缓存
-                        lookup.setCache(null);
-                        lookup.setResolver(new SimpleResolver("119.29.29.29"));
+                        lookup.setCache(null); // Disable cache
+                        lookup.setResolver(new SimpleResolver("114.114.114.114"));
                         final Record[] records = lookup.run();
                         if (lookup.getResult() == Lookup.SUCCESSFUL && records.length > 0) {
                             final TXTRecord txtRecord = (TXTRecord) records[0];
@@ -176,7 +173,6 @@ public final class InetEndpoint {
                             resolved = null;
                         }
                     }
-                    lastResolution = Instant.now();
                 } catch (final UnknownHostException | TextParseException e) {
                     resolved = null;
                 }
